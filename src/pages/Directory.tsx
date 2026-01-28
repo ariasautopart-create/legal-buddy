@@ -47,8 +47,20 @@ import {
   Globe,
   Edit,
   User,
-  BadgeCheck
+  BadgeCheck,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  FileDown
 } from 'lucide-react';
+import { useDirectoryExport } from '@/hooks/useDirectoryExport';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 interface CourtContact {
   id: string;
@@ -152,9 +164,20 @@ const getSpecializationLabel = (spec: string) => {
 export default function Directory() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const {
+    exportCourtsToExcel,
+    exportCourtsToCSV,
+    exportBailiffsToExcel,
+    exportBailiffsToCSV,
+    parseCourtFile,
+    parseBailiffFile,
+    downloadCourtTemplate,
+    downloadBailiffTemplate,
+  } = useDirectoryExport();
+  
   const [activeTab, setActiveTab] = useState('courts');
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [importing, setImporting] = useState(false);
   // Courts state
   const [courts, setCourts] = useState<CourtContact[]>([]);
   const [loadingCourts, setLoadingCourts] = useState(true);
@@ -493,6 +516,114 @@ export default function Directory() {
     bailiff.license_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleImportCourts = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setImporting(true);
+    try {
+      const courtsData = await parseCourtFile(file);
+      
+      if (courtsData.length === 0) {
+        toast({
+          title: 'Archivo vacío',
+          description: 'No se encontraron tribunales en el archivo',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const courtsToInsert = courtsData.map(court => ({
+        user_id: user.id,
+        name: court.name || '',
+        court_type: court.court_type || 'primera_instancia',
+        jurisdiction: court.jurisdiction || null,
+        department: court.department || null,
+        address: court.address || null,
+        phone: court.phone || null,
+        phone_secondary: court.phone_secondary || null,
+        email: court.email || null,
+        website: court.website || null,
+        schedule: court.schedule || null,
+        notes: court.notes || null,
+      }));
+
+      const { error } = await supabase.from('court_directory').insert(courtsToInsert);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Importación exitosa',
+        description: `Se importaron ${courtsData.length} tribunales`,
+      });
+      fetchCourts();
+    } catch (error: any) {
+      console.error('Error importing courts:', error);
+      toast({
+        title: 'Error al importar',
+        description: error.message || 'No se pudo importar el archivo',
+        variant: 'destructive',
+      });
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleImportBailiffs = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setImporting(true);
+    try {
+      const bailiffsData = await parseBailiffFile(file);
+      
+      if (bailiffsData.length === 0) {
+        toast({
+          title: 'Archivo vacío',
+          description: 'No se encontraron alguaciles en el archivo',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const bailiffsToInsert = bailiffsData.map(bailiff => ({
+        user_id: user.id,
+        name: bailiff.name || '',
+        license_number: bailiff.license_number || null,
+        court_assigned: bailiff.court_assigned || null,
+        jurisdiction: bailiff.jurisdiction || null,
+        phone: bailiff.phone || null,
+        phone_secondary: bailiff.phone_secondary || null,
+        email: bailiff.email || null,
+        address: bailiff.address || null,
+        specialization: bailiff.specialization || 'general',
+        status: bailiff.status || 'active',
+        notes: bailiff.notes || null,
+      }));
+
+      const { error } = await supabase.from('bailiff_directory').insert(bailiffsToInsert);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Importación exitosa',
+        description: `Se importaron ${bailiffsData.length} alguaciles`,
+      });
+      fetchBailiffs();
+    } catch (error: any) {
+      console.error('Error importing bailiffs:', error);
+      toast({
+        title: 'Error al importar',
+        description: error.message || 'No se pudo importar el archivo',
+        variant: 'destructive',
+      });
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <AppLayout title="Directorio de Contactos">
       <div className="space-y-6 animate-fade-in">
@@ -524,7 +655,46 @@ export default function Directory() {
 
           {/* Courts Tab */}
           <TabsContent value="courts" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 flex-wrap">
+              {/* Import/Export Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Importar/Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportCourtsToExcel(courts)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar a Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportCourtsToCSV(courts)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar a CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <label className="cursor-pointer flex items-center">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Importar desde archivo
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleImportCourts}
+                        disabled={importing}
+                      />
+                    </label>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={downloadCourtTemplate}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Descargar plantilla
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Dialog open={isCourtDialogOpen} onOpenChange={(open) => {
                 setIsCourtDialogOpen(open);
                 if (!open) {
@@ -809,7 +979,46 @@ export default function Directory() {
 
           {/* Bailiffs Tab */}
           <TabsContent value="bailiffs" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 flex-wrap">
+              {/* Import/Export Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Importar/Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportBailiffsToExcel(bailiffs)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar a Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportBailiffsToCSV(bailiffs)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar a CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <label className="cursor-pointer flex items-center">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Importar desde archivo
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleImportBailiffs}
+                        disabled={importing}
+                      />
+                    </label>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={downloadBailiffTemplate}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Descargar plantilla
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Dialog open={isBailiffDialogOpen} onOpenChange={(open) => {
                 setIsBailiffDialogOpen(open);
                 if (!open) {
