@@ -7,7 +7,8 @@ import {
   FileText, 
   Settings,
   LogOut,
-  Scale
+  Scale,
+  FolderOpen
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +30,7 @@ const mainNavItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Clientes', url: '/clients', icon: Users },
   { title: 'Casos', url: '/cases', icon: Briefcase },
+  { title: 'Documentos', url: '/documents', icon: FolderOpen },
   { title: 'Plazos', url: '/deadlines', icon: Clock },
   { title: 'Calendario', url: '/calendar', icon: Calendar },
   { title: 'Facturación', url: '/invoices', icon: FileText },
