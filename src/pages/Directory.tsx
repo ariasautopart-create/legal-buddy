@@ -51,8 +51,7 @@ import {
   Download,
   Upload,
   FileSpreadsheet,
-  FileDown,
-  Stamp
+  FileDown
 } from 'lucide-react';
 import { useDirectoryExport } from '@/hooks/useDirectoryExport';
 import {
@@ -62,7 +61,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import NotaryDirectory from '@/components/directory/NotaryDirectory';
 
 interface CourtContact {
   id: string;
@@ -644,23 +642,14 @@ export default function Directory() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="courts" className="gap-2">
               <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Tribunales</span>
-              <span className="sm:hidden">Trib.</span>
-              ({courts.length})
+              Tribunales ({courts.length})
             </TabsTrigger>
             <TabsTrigger value="bailiffs" className="gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Alguaciles</span>
-              <span className="sm:hidden">Alg.</span>
-              ({bailiffs.length})
-            </TabsTrigger>
-            <TabsTrigger value="notaries" className="gap-2">
-              <Stamp className="h-4 w-4" />
-              <span className="hidden sm:inline">Notarios</span>
-              <span className="sm:hidden">Not.</span>
+              Alguaciles ({bailiffs.length})
             </TabsTrigger>
           </TabsList>
 
@@ -1315,11 +1304,6 @@ export default function Directory() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          {/* Notaries Tab */}
-          <TabsContent value="notaries" className="space-y-4">
-            <NotaryDirectory searchTerm={searchTerm} />
           </TabsContent>
         </Tabs>
 

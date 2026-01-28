@@ -524,69 +524,6 @@ export type Database = {
         }
         Relationships: []
       }
-      notary_directory: {
-        Row: {
-          address: string | null
-          created_at: string
-          email: string | null
-          id: string
-          jurisdiction: string | null
-          license_number: string | null
-          name: string
-          notary_type: string | null
-          notes: string | null
-          office_name: string | null
-          phone: string | null
-          phone_secondary: string | null
-          schedule: string | null
-          specializations: string[] | null
-          status: string | null
-          updated_at: string
-          user_id: string
-          website: string | null
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          jurisdiction?: string | null
-          license_number?: string | null
-          name: string
-          notary_type?: string | null
-          notes?: string | null
-          office_name?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          schedule?: string | null
-          specializations?: string[] | null
-          status?: string | null
-          updated_at?: string
-          user_id: string
-          website?: string | null
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          jurisdiction?: string | null
-          license_number?: string | null
-          name?: string
-          notary_type?: string | null
-          notes?: string | null
-          office_name?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          schedule?: string | null
-          specializations?: string[] | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string
-          website?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
