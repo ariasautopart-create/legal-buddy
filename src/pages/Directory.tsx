@@ -52,7 +52,9 @@ import {
   Upload,
   FileSpreadsheet,
   FileDown,
-  Stamp
+  Stamp,
+  Filter,
+  X
 } from 'lucide-react';
 import { useDirectoryExport } from '@/hooks/useDirectoryExport';
 import {
@@ -63,6 +65,11 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import NotaryDirectory from '@/components/directory/NotaryDirectory';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface CourtContact {
   id: string;
@@ -180,6 +187,17 @@ export default function Directory() {
   const [activeTab, setActiveTab] = useState('courts');
   const [searchTerm, setSearchTerm] = useState('');
   const [importing, setImporting] = useState(false);
+  
+  // Filters state
+  const [courtFilters, setCourtFilters] = useState({
+    type: '',
+    jurisdiction: '',
+  });
+  const [bailiffFilters, setBailiffFilters] = useState({
+    jurisdiction: '',
+    specialization: '',
+    status: '',
+  });
   // Courts state
   const [courts, setCourts] = useState<CourtContact[]>([]);
   const [loadingCourts, setLoadingCourts] = useState(true);
@@ -505,18 +523,31 @@ export default function Directory() {
     setIsBailiffDialogOpen(true);
   };
 
-  const filteredCourts = courts.filter(court =>
-    court.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    court.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    court.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCourts = courts.filter(court => {
+    const matchesSearch = court.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.department?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !courtFilters.type || court.court_type === courtFilters.type;
+    const matchesJurisdiction = !courtFilters.jurisdiction || court.jurisdiction === courtFilters.jurisdiction;
+    return matchesSearch && matchesType && matchesJurisdiction;
+  });
 
-  const filteredBailiffs = bailiffs.filter(bailiff =>
-    bailiff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bailiff.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bailiff.court_assigned?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bailiff.license_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBailiffs = bailiffs.filter(bailiff => {
+    const matchesSearch = bailiff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bailiff.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bailiff.court_assigned?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bailiff.license_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesJurisdiction = !bailiffFilters.jurisdiction || bailiff.jurisdiction === bailiffFilters.jurisdiction;
+    const matchesSpecialization = !bailiffFilters.specialization || bailiff.specialization === bailiffFilters.specialization;
+    const matchesStatus = !bailiffFilters.status || bailiff.status === bailiffFilters.status;
+    return matchesSearch && matchesJurisdiction && matchesSpecialization && matchesStatus;
+  });
+
+  const activeCourtFiltersCount = Object.values(courtFilters).filter(v => v).length;
+  const activeBailiffFiltersCount = Object.values(bailiffFilters).filter(v => v).length;
+
+  const clearCourtFilters = () => setCourtFilters({ type: '', jurisdiction: '' });
+  const clearBailiffFilters = () => setBailiffFilters({ jurisdiction: '', specialization: '', status: '' });
 
   const handleImportCourts = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -666,7 +697,95 @@ export default function Directory() {
 
           {/* Courts Tab */}
           <TabsContent value="courts" className="space-y-4">
-            <div className="flex justify-end gap-2 flex-wrap">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    {activeCourtFiltersCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
+                        {activeCourtFiltersCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 bg-popover" align="start">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Filtros</h4>
+                      {activeCourtFiltersCount > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearCourtFilters}>
+                          Limpiar
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo de Tribunal</Label>
+                      <Select
+                        value={courtFilters.type}
+                        onValueChange={(value) => setCourtFilters(prev => ({ ...prev, type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos los tipos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todos los tipos</SelectItem>
+                          {COURT_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Jurisdicción</Label>
+                      <Select
+                        value={courtFilters.jurisdiction}
+                        onValueChange={(value) => setCourtFilters(prev => ({ ...prev, jurisdiction: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas las jurisdicciones" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todas las jurisdicciones</SelectItem>
+                          {JURISDICTIONS.map((jur) => (
+                            <SelectItem key={jur} value={jur}>
+                              {jur}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Active filters badges */}
+              {courtFilters.type && (
+                <Badge variant="secondary" className="gap-1">
+                  {getCourtTypeLabel(courtFilters.type)}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setCourtFilters(prev => ({ ...prev, type: '' }))}
+                  />
+                </Badge>
+              )}
+              {courtFilters.jurisdiction && (
+                <Badge variant="secondary" className="gap-1">
+                  {courtFilters.jurisdiction}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setCourtFilters(prev => ({ ...prev, jurisdiction: '' }))}
+                  />
+                </Badge>
+              )}
+              
+              <div className="flex-1" />
+              
+              {/* Import/Export and Add buttons */}
               {/* Import/Export Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -990,7 +1109,120 @@ export default function Directory() {
 
           {/* Bailiffs Tab */}
           <TabsContent value="bailiffs" className="space-y-4">
-            <div className="flex justify-end gap-2 flex-wrap">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    {activeBailiffFiltersCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
+                        {activeBailiffFiltersCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 bg-popover" align="start">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Filtros</h4>
+                      {activeBailiffFiltersCount > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearBailiffFilters}>
+                          Limpiar
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Jurisdicción</Label>
+                      <Select
+                        value={bailiffFilters.jurisdiction}
+                        onValueChange={(value) => setBailiffFilters(prev => ({ ...prev, jurisdiction: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas las jurisdicciones" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todas las jurisdicciones</SelectItem>
+                          {JURISDICTIONS.map((jur) => (
+                            <SelectItem key={jur} value={jur}>
+                              {jur}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Especialización</Label>
+                      <Select
+                        value={bailiffFilters.specialization}
+                        onValueChange={(value) => setBailiffFilters(prev => ({ ...prev, specialization: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas las especialidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todas las especialidades</SelectItem>
+                          {SPECIALIZATIONS.map((spec) => (
+                            <SelectItem key={spec.value} value={spec.value}>
+                              {spec.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Select
+                        value={bailiffFilters.status}
+                        onValueChange={(value) => setBailiffFilters(prev => ({ ...prev, status: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos los estados" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todos los estados</SelectItem>
+                          <SelectItem value="active">Activo</SelectItem>
+                          <SelectItem value="inactive">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Active filters badges */}
+              {bailiffFilters.jurisdiction && (
+                <Badge variant="secondary" className="gap-1">
+                  {bailiffFilters.jurisdiction}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setBailiffFilters(prev => ({ ...prev, jurisdiction: '' }))}
+                  />
+                </Badge>
+              )}
+              {bailiffFilters.specialization && (
+                <Badge variant="secondary" className="gap-1">
+                  {getSpecializationLabel(bailiffFilters.specialization)}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setBailiffFilters(prev => ({ ...prev, specialization: '' }))}
+                  />
+                </Badge>
+              )}
+              {bailiffFilters.status && (
+                <Badge variant="secondary" className="gap-1">
+                  {bailiffFilters.status === 'active' ? 'Activo' : 'Inactivo'}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setBailiffFilters(prev => ({ ...prev, status: '' }))}
+                  />
+                </Badge>
+              )}
+              
+              <div className="flex-1" />
+              
+              {/* Import/Export and Add buttons */}
               {/* Import/Export Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
