@@ -11,8 +11,7 @@ import {
   FolderOpen,
   BarChart3,
   Library,
-  Contact,
-  Download
+  Contact
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,15 +104,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="gradient-sidebar p-4 border-t border-sidebar-border space-y-2">
-        <NavLink 
-          to="/install" 
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-        >
-          <Download className="h-5 w-5" />
-          <span className="font-body">Instalar App</span>
-        </NavLink>
+      <SidebarFooter className="gradient-sidebar p-4 border-t border-sidebar-border">
         <Button 
           variant="ghost" 
           className="w-full justify-start gap-3 text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
