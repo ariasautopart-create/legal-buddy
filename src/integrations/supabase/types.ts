@@ -356,6 +356,66 @@ export type Database = {
           },
         ]
       }
+      legal_resources: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          issue_date: string | null
+          keywords: string[] | null
+          notes: string | null
+          reference_number: string | null
+          source: string | null
+          subcategory: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          issue_date?: string | null
+          keywords?: string[] | null
+          notes?: string | null
+          reference_number?: string | null
+          source?: string | null
+          subcategory?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          issue_date?: string | null
+          keywords?: string[] | null
+          notes?: string | null
+          reference_number?: string | null
+          source?: string | null
+          subcategory?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
