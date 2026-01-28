@@ -53,8 +53,8 @@ export function AppSidebar() {
             <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-display text-lg font-semibold text-sidebar-foreground">LexisPro</h1>
-            <p className="text-xs text-sidebar-foreground/70">Gestión Legal</p>
+            <h1 className="font-display text-lg font-semibold text-sidebar-foreground">ARIAS LEGAL</h1>
+            <p className="text-xs text-sidebar-foreground/70">GESTIÓN</p>
           </div>
         </div>
       </SidebarHeader>
