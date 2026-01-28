@@ -72,14 +72,18 @@ interface LegalResource {
   created_at: string;
 }
 
+// Categorías adaptadas al sistema jurídico de República Dominicana
 const CATEGORIES = [
-  { value: 'jurisprudencia', label: 'Jurisprudencia', icon: Gavel },
-  { value: 'ley', label: 'Leyes', icon: Scale },
-  { value: 'codigo', label: 'Códigos', icon: BookOpen },
-  { value: 'reglamento', label: 'Reglamentos', icon: FileText },
-  { value: 'resolucion', label: 'Resoluciones', icon: FileCheck },
-  { value: 'decreto', label: 'Decretos', icon: ScrollText },
-  { value: 'sentencia', label: 'Sentencias', icon: Gavel },
+  { value: 'constitucion', label: 'Constitución', icon: Scale, description: 'Constitución de la República Dominicana' },
+  { value: 'ley', label: 'Leyes', icon: BookOpen, description: 'Leyes orgánicas y ordinarias del Congreso Nacional' },
+  { value: 'decreto', label: 'Decretos', icon: ScrollText, description: 'Decretos del Poder Ejecutivo' },
+  { value: 'reglamento', label: 'Reglamentos', icon: FileText, description: 'Reglamentos de aplicación de leyes' },
+  { value: 'resolucion', label: 'Resoluciones', icon: FileCheck, description: 'Resoluciones administrativas y ministeriales' },
+  { value: 'ordenanza', label: 'Ordenanzas', icon: Building, description: 'Ordenanzas municipales y distritales' },
+  { value: 'jurisprudencia_scj', label: 'Jurisprudencia SCJ', icon: Gavel, description: 'Sentencias de la Suprema Corte de Justicia' },
+  { value: 'jurisprudencia_tc', label: 'Jurisprudencia TC', icon: Gavel, description: 'Sentencias del Tribunal Constitucional' },
+  { value: 'codigo', label: 'Códigos', icon: BookOpen, description: 'Códigos Civil, Penal, Laboral, Tributario, etc.' },
+  { value: 'tratado', label: 'Tratados Internacionales', icon: Scale, description: 'Convenios y tratados ratificados por RD' },
 ];
 
 const getCategoryInfo = (category: string) => {
@@ -102,7 +106,7 @@ export default function LegalResources() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'jurisprudencia',
+    category: 'ley',
     subcategory: '',
     reference_number: '',
     issue_date: '',
@@ -278,7 +282,7 @@ export default function LegalResources() {
     setFormData({
       title: '',
       description: '',
-      category: 'jurisprudencia',
+      category: 'ley',
       subcategory: '',
       reference_number: '',
       issue_date: '',
@@ -380,7 +384,7 @@ export default function LegalResources() {
                     <Label htmlFor="reference_number">Número de Referencia</Label>
                     <Input
                       id="reference_number"
-                      placeholder="Ej: Ley 1234/2024"
+                      placeholder="Ej: Ley No. 107-13, Decreto 230-18"
                       value={formData.reference_number}
                       onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
                     />
@@ -401,7 +405,7 @@ export default function LegalResources() {
                     <Label htmlFor="source">Fuente / Organismo</Label>
                     <Input
                       id="source"
-                      placeholder="Ej: Congreso Nacional, Corte Suprema"
+                      placeholder="Ej: Congreso Nacional, SCJ, Poder Ejecutivo, TC"
                       value={formData.source}
                       onChange={(e) => setFormData({ ...formData, source: e.target.value })}
                     />
