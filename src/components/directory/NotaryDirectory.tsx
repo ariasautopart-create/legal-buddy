@@ -55,16 +55,9 @@ import {
   FileSpreadsheet,
   FileDown,
   Stamp,
-  Building,
-  Filter,
-  X
+  Building
 } from 'lucide-react';
 import { useNotaryExport } from '@/hooks/useNotaryExport';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 
 export interface NotaryContact {
   id: string;
@@ -160,14 +153,6 @@ export default function NotaryDirectory({ searchTerm }: NotaryDirectoryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingNotary, setEditingNotary] = useState<NotaryContact | null>(null);
   const [deleteNotary, setDeleteNotary] = useState<NotaryContact | null>(null);
-
-  // Filters state
-  const [filters, setFilters] = useState({
-    type: '',
-    jurisdiction: '',
-    specialization: '',
-    status: '',
-  });
 
   const [form, setForm] = useState({
     name: '',
@@ -407,24 +392,12 @@ export default function NotaryDirectory({ searchTerm }: NotaryDirectoryProps) {
     }));
   };
 
-  const filteredNotaries = notaries.filter(notary => {
-    const matchesSearch = notary.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notary.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notary.office_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notary.license_number?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = !filters.type || notary.notary_type === filters.type;
-    const matchesJurisdiction = !filters.jurisdiction || notary.jurisdiction === filters.jurisdiction;
-    const matchesSpecialization = !filters.specialization || notary.specializations?.includes(filters.specialization);
-    const matchesStatus = !filters.status || notary.status === filters.status;
-    return matchesSearch && matchesType && matchesJurisdiction && matchesSpecialization && matchesStatus;
-  });
-
-  const activeFiltersCount = Object.values(filters).filter(v => v).length;
-  const clearFilters = () => setFilters({ type: '', jurisdiction: '', specialization: '', status: '' });
-
-  const getSpecLabel = (spec: string) => {
-    return SPECIALIZATIONS.find(s => s.value === spec)?.label || spec;
-  };
+  const filteredNotaries = notaries.filter(notary =>
+    notary.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    notary.jurisdiction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    notary.office_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    notary.license_number?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -436,148 +409,7 @@ export default function NotaryDirectory({ searchTerm }: NotaryDirectoryProps) {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filtros
-              {activeFiltersCount > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
-                  {activeFiltersCount}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 bg-popover" align="start">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Filtros</h4>
-                {activeFiltersCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    Limpiar
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de Notario</Label>
-                <Select
-                  value={filters.type}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos los tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos los tipos</SelectItem>
-                    {NOTARY_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Jurisdicción</Label>
-                <Select
-                  value={filters.jurisdiction}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, jurisdiction: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas las jurisdicciones" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todas las jurisdicciones</SelectItem>
-                    {JURISDICTIONS.map((jur) => (
-                      <SelectItem key={jur} value={jur}>
-                        {jur}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Especialidad</Label>
-                <Select
-                  value={filters.specialization}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, specialization: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas las especialidades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todas las especialidades</SelectItem>
-                    {SPECIALIZATIONS.map((spec) => (
-                      <SelectItem key={spec.value} value={spec.value}>
-                        {spec.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Estado</Label>
-                <Select
-                  value={filters.status}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos los estados" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos los estados</SelectItem>
-                    <SelectItem value="active">Activo</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        {/* Active filters badges */}
-        {filters.type && (
-          <Badge variant="secondary" className="gap-1">
-            {getNotaryTypeLabel(filters.type)}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => setFilters(prev => ({ ...prev, type: '' }))}
-            />
-          </Badge>
-        )}
-        {filters.jurisdiction && (
-          <Badge variant="secondary" className="gap-1">
-            {filters.jurisdiction}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => setFilters(prev => ({ ...prev, jurisdiction: '' }))}
-            />
-          </Badge>
-        )}
-        {filters.specialization && (
-          <Badge variant="secondary" className="gap-1">
-            {getSpecLabel(filters.specialization)}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => setFilters(prev => ({ ...prev, specialization: '' }))}
-            />
-          </Badge>
-        )}
-        {filters.status && (
-          <Badge variant="secondary" className="gap-1">
-            {filters.status === 'active' ? 'Activo' : 'Inactivo'}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => setFilters(prev => ({ ...prev, status: '' }))}
-            />
-          </Badge>
-        )}
-        
-        <div className="flex-1" />
-        
-        {/* Import/Export and Add buttons */}
+      <div className="flex justify-end gap-2 flex-wrap">
         {/* Import/Export Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
