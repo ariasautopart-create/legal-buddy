@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.ariaslegal.gestion",
+  "productName": "ARIAS LEGAL GESTIÓN",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "public/pwa-512x512.png"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/pwa-512x512.png",
+    "artifactName": "${productName}-Setup-${version}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "public/pwa-512x512.png",
+    "uninstallerIcon": "public/pwa-512x512.png",
+    "installerHeaderIcon": "public/pwa-512x512.png",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "ARIAS LEGAL GESTIÓN",
+    "language": "1034"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "public/pwa-512x512.png",
+    "category": "public.app-category.business"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "icon": "public/pwa-512x512.png",
+    "category": "Office"
+  }
+}
