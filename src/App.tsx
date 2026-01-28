@@ -13,6 +13,7 @@ import Deadlines from "./pages/Deadlines";
 import CalendarPage from "./pages/CalendarPage";
 import Invoices from "./pages/Invoices";
 import LegalResources from "./pages/LegalResources";
+import Directory from "./pages/Directory";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
             <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
             <Route path="/legal-resources" element={<ProtectedRoute><LegalResources /></ProtectedRoute>} />
+            <Route path="/directory" element={<ProtectedRoute><Directory /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
