@@ -10,7 +10,8 @@ import {
   Scale,
   FolderOpen,
   BarChart3,
-  Library
+  Library,
+  Contact
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +38,7 @@ const mainNavItems = [
   { title: 'Calendario', url: '/calendar', icon: Calendar },
   { title: 'Facturación', url: '/invoices', icon: FileText },
   { title: 'Recursos Legales', url: '/legal-resources', icon: Library },
+  { title: 'Directorio', url: '/directory', icon: Contact },
   { title: 'Reportes', url: '/reports', icon: BarChart3 },
 ];
 

@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      bailiff_directory: {
+        Row: {
+          address: string | null
+          court_assigned: string | null
+          created_at: string
+          email: string | null
+          id: string
+          jurisdiction: string | null
+          license_number: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          phone_secondary: string | null
+          specialization: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          court_assigned?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          jurisdiction?: string | null
+          license_number?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          specialization?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          court_assigned?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          jurisdiction?: string | null
+          license_number?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          specialization?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           case_id: string | null
@@ -184,6 +238,60 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      court_directory: {
+        Row: {
+          address: string | null
+          court_type: string
+          created_at: string
+          department: string | null
+          email: string | null
+          id: string
+          jurisdiction: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          phone_secondary: string | null
+          schedule: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          court_type: string
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          jurisdiction?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          schedule?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          court_type?: string
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          jurisdiction?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          schedule?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
         }
         Relationships: []
       }
