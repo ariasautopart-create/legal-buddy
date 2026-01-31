@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, FileText, Edit, Trash2, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, Search, FileText, Trash2, Loader2, CheckCircle, Printer, Receipt } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -29,19 +29,46 @@ interface Invoice {
   paid_date: string | null;
   notes: string | null;
   client_id: string;
-  clients?: { name: string };
+  currency: string;
+  ncf_type: string | null;
+  ncf: string | null;
+  exchange_rate: number;
+  rnc_cedula: string | null;
+  clients?: { name: string; document_number: string | null };
 }
 
 interface Client {
   id: string;
   name: string;
+  document_number: string | null;
 }
+
+// Tipos de NCF según normativa DGII República Dominicana
+const ncfTypes = [
+  { value: 'B01', label: 'B01 - Crédito Fiscal', description: 'Para contribuyentes con RNC' },
+  { value: 'B02', label: 'B02 - Consumo Final', description: 'Para consumidores finales' },
+  { value: 'B14', label: 'B14 - Régimen Especial', description: 'Zonas francas y régimen especial' },
+  { value: 'B15', label: 'B15 - Gubernamental', description: 'Entidades gubernamentales' },
+  { value: 'B16', label: 'B16 - Exportación', description: 'Exportaciones' },
+];
+
+const currencyOptions = [
+  { value: 'DOP', label: 'RD$ - Peso Dominicano', symbol: 'RD$' },
+  { value: 'USD', label: 'US$ - Dólar Estadounidense', symbol: 'US$' },
+];
+
+// Tasas de ITBIS según normativa dominicana
+const itbisOptions = [
+  { value: '0', label: '0% - Exento' },
+  { value: '16', label: '16% - Reducido' },
+  { value: '18', label: '18% - General' },
+];
 
 const statusOptions = [
   { value: 'pending', label: 'Pendiente', color: 'bg-warning/10 text-warning border-warning/20' },
   { value: 'paid', label: 'Pagada', color: 'bg-success/10 text-success border-success/20' },
   { value: 'overdue', label: 'Vencida', color: 'bg-destructive/10 text-destructive border-destructive/20' },
-  { value: 'cancelled', label: 'Cancelada', color: 'bg-muted text-muted-foreground' },
+  { value: 'cancelled', label: 'Anulada', color: 'bg-muted text-muted-foreground' },
 ];
 
 export default function Invoices() {
@@ -56,12 +83,18 @@ export default function Invoices() {
     invoice_number: '',
     concept: '',
     amount: '',
-    tax_rate: '21',
+    tax_rate: '18',
     client_id: '',
     due_date: '',
-    notes: ''
+    notes: '',
+    currency: 'DOP',
+    ncf_type: 'B02',
+    ncf: '',
+    exchange_rate: '1.00',
+    rnc_cedula: ''
   });
   const [saving, setSaving] = useState(false);
+  const [currencyFilter, setCurrencyFilter] = useState<string>('all');
 
   useEffect(() => {
     if (user) {
@@ -70,11 +103,34 @@ export default function Invoices() {
     }
   }, [user]);
 
+  // Generar NCF automático basado en el tipo
+  const generateNCF = (type: string) => {
+    const timestamp = Date.now().toString().slice(-8);
+    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    return `${type}${timestamp}${random}`;
+  };
+
+  useEffect(() => {
+    if (formData.ncf_type && !formData.ncf) {
+      setFormData(prev => ({ ...prev, ncf: generateNCF(prev.ncf_type) }));
+    }
+  }, [formData.ncf_type]);
+
+  // Auto-completar RNC/Cédula cuando se selecciona cliente
+  const handleClientChange = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    setFormData(prev => ({ 
+      ...prev, 
+      client_id: clientId,
+      rnc_cedula: client?.document_number || ''
+    }));
+  };
+
   const fetchInvoices = async () => {
     try {
       const { data, error } = await supabase
         .from('invoices')
-        .select('*, clients(name)')
+        .select('*, clients(name, document_number)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -87,7 +143,7 @@ export default function Invoices() {
   };
 
   const fetchClients = async () => {
-    const { data } = await supabase.from('clients').select('id, name').eq('status', 'active');
+    const { data } = await supabase.from('clients').select('id, name, document_number').eq('status', 'active');
     setClients(data || []);
   };
 
@@ -95,6 +151,11 @@ export default function Invoices() {
     e.preventDefault();
     if (!formData.invoice_number || !formData.concept || !formData.amount || !formData.client_id) {
       toast({ title: 'Error', description: 'Complete los campos obligatorios', variant: 'destructive' });
+      return;
+    }
+
+    if (!formData.ncf_type || !formData.ncf) {
+      toast({ title: 'Error', description: 'El NCF es obligatorio para facturación electrónica', variant: 'destructive' });
       return;
     }
 
@@ -115,11 +176,16 @@ export default function Invoices() {
           total_amount: totalAmount,
           client_id: formData.client_id,
           due_date: formData.due_date || null,
-          notes: formData.notes || null
+          notes: formData.notes || null,
+          currency: formData.currency,
+          ncf_type: formData.ncf_type,
+          ncf: formData.ncf,
+          exchange_rate: parseFloat(formData.exchange_rate),
+          rnc_cedula: formData.rnc_cedula || null
         });
 
       if (error) throw error;
-      toast({ title: 'Factura creada' });
+      toast({ title: 'Factura electrónica creada', description: `NCF: ${formData.ncf}` });
       setIsDialogOpen(false);
       resetForm();
       fetchInvoices();
@@ -146,12 +212,16 @@ export default function Invoices() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta factura?')) return;
+    if (!confirm('¿Anular esta factura? Las facturas electrónicas no pueden eliminarse, solo anularse.')) return;
     
     try {
-      const { error } = await supabase.from('invoices').delete().eq('id', id);
+      // En facturación electrónica no se eliminan, se anulan
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
       if (error) throw error;
-      toast({ title: 'Factura eliminada' });
+      toast({ title: 'Factura anulada' });
       fetchInvoices();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -163,24 +233,36 @@ export default function Invoices() {
       invoice_number: '',
       concept: '',
       amount: '',
-      tax_rate: '21',
+      tax_rate: '18',
       client_id: '',
       due_date: '',
-      notes: ''
+      notes: '',
+      currency: 'DOP',
+      ncf_type: 'B02',
+      ncf: '',
+      exchange_rate: '1.00',
+      rnc_cedula: ''
     });
   };
 
-  const filteredInvoices = invoices.filter(i => 
-    i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.concept.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.clients?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredInvoices = invoices.filter(i => {
+    const matchesSearch = 
+      i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.concept.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.clients?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.ncf?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCurrency = currencyFilter === 'all' || i.currency === currencyFilter;
+    
+    return matchesSearch && matchesCurrency;
+  });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
+  const formatCurrency = (amount: number, currency: string = 'DOP') => {
+    const symbol = currency === 'USD' ? 'US$' : 'RD$';
+    return `${symbol} ${new Intl.NumberFormat('es-DO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -192,49 +274,81 @@ export default function Invoices() {
     );
   };
 
-  const totalPending = invoices
-    .filter(i => i.status === 'pending')
-    .reduce((sum, i) => sum + Number(i.total_amount), 0);
+  const getNcfTypeBadge = (ncfType: string | null) => {
+    if (!ncfType) return null;
+    const type = ncfTypes.find(t => t.value === ncfType);
+    return (
+      <Badge variant="secondary" className="text-xs">
+        {type?.value || ncfType}
+      </Badge>
+    );
+  };
 
-  const totalPaid = invoices
-    .filter(i => i.status === 'paid')
-    .reduce((sum, i) => sum + Number(i.total_amount), 0);
+  // Calcular totales por moneda
+  const totalsByMoney = {
+    DOP: {
+      pending: invoices.filter(i => i.status === 'pending' && i.currency === 'DOP').reduce((sum, i) => sum + Number(i.total_amount), 0),
+      paid: invoices.filter(i => i.status === 'paid' && i.currency === 'DOP').reduce((sum, i) => sum + Number(i.total_amount), 0),
+    },
+    USD: {
+      pending: invoices.filter(i => i.status === 'pending' && i.currency === 'USD').reduce((sum, i) => sum + Number(i.total_amount), 0),
+      paid: invoices.filter(i => i.status === 'paid' && i.currency === 'USD').reduce((sum, i) => sum + Number(i.total_amount), 0),
+    }
+  };
 
   return (
-    <AppLayout title="Facturación">
+    <AppLayout title="Facturación Electrónica">
       <div className="space-y-6 animate-fade-in">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="shadow-card bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20">
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Pendiente de cobro</p>
-              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalPending)}</p>
+              <p className="text-sm text-muted-foreground">Pendiente RD$</p>
+              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalsByMoney.DOP.pending, 'DOP')}</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Pendiente US$</p>
+              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalsByMoney.USD.pending, 'USD')}</p>
             </CardContent>
           </Card>
           <Card className="shadow-card bg-gradient-to-br from-success/10 to-success/5 border-success/20">
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Cobrado este mes</p>
-              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalPaid)}</p>
+              <p className="text-sm text-muted-foreground">Cobrado RD$</p>
+              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalsByMoney.DOP.paid, 'DOP')}</p>
             </CardContent>
           </Card>
-          <Card className="shadow-card">
+          <Card className="shadow-card bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Total facturas</p>
-              <p className="text-2xl font-display font-bold text-foreground">{invoices.length}</p>
+              <p className="text-sm text-muted-foreground">Cobrado US$</p>
+              <p className="text-2xl font-display font-bold text-foreground">{formatCurrency(totalsByMoney.USD.paid, 'USD')}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar facturas..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por NCF, cliente, concepto..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Moneda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="DOP">RD$ Pesos</SelectItem>
+                <SelectItem value="USD">US$ Dólares</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
@@ -243,14 +357,56 @@ export default function Invoices() {
                 Nueva Factura
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-display">Nueva Factura</DialogTitle>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Nueva Factura Electrónica (e-CF)
+                </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                {/* Sección NCF */}
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <h3 className="font-semibold text-sm mb-3 text-primary">Comprobante Fiscal (DGII)</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ncf_type">Tipo de NCF *</Label>
+                      <Select 
+                        value={formData.ncf_type} 
+                        onValueChange={(v) => setFormData({ ...formData, ncf_type: v, ncf: generateNCF(v) })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ncfTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              <div>
+                                <div className="font-medium">{type.label}</div>
+                                <div className="text-xs text-muted-foreground">{type.description}</div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ncf">NCF *</Label>
+                      <Input
+                        id="ncf"
+                        value={formData.ncf}
+                        onChange={(e) => setFormData({ ...formData, ncf: e.target.value })}
+                        placeholder="Ej: B0200000001"
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datos básicos */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="invoice_number">Nº Factura *</Label>
+                    <Label htmlFor="invoice_number">Nº Factura Interno *</Label>
                     <Input
                       id="invoice_number"
                       value={formData.invoice_number}
@@ -260,7 +416,7 @@ export default function Invoices() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="client">Cliente *</Label>
-                    <Select value={formData.client_id} onValueChange={(v) => setFormData({ ...formData, client_id: v })}>
+                    <Select value={formData.client_id} onValueChange={handleClientChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar" />
                       </SelectTrigger>
@@ -272,18 +428,44 @@ export default function Invoices() {
                     </Select>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="rnc_cedula">RNC/Cédula del Cliente</Label>
+                  <Input
+                    id="rnc_cedula"
+                    value={formData.rnc_cedula}
+                    onChange={(e) => setFormData({ ...formData, rnc_cedula: e.target.value })}
+                    placeholder="RNC o Cédula"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="concept">Concepto *</Label>
                   <Input
                     id="concept"
                     value={formData.concept}
                     onChange={(e) => setFormData({ ...formData, concept: e.target.value })}
-                    placeholder="Honorarios profesionales..."
+                    placeholder="Honorarios profesionales por servicios legales..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                {/* Moneda y Montos */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Importe Base (€) *</Label>
+                    <Label htmlFor="currency">Moneda *</Label>
+                    <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencyOptions.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Monto Base *</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -294,21 +476,36 @@ export default function Invoices() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="tax_rate">IVA (%)</Label>
+                    <Label htmlFor="tax_rate">ITBIS</Label>
                     <Select value={formData.tax_rate} onValueChange={(v) => setFormData({ ...formData, tax_rate: v })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0">0%</SelectItem>
-                        <SelectItem value="10">10%</SelectItem>
-                        <SelectItem value="21">21%</SelectItem>
+                        {itbisOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
+                {formData.currency === 'USD' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="exchange_rate">Tasa de Cambio (1 USD = X DOP)</Label>
+                    <Input
+                      id="exchange_rate"
+                      type="number"
+                      step="0.01"
+                      value={formData.exchange_rate}
+                      onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
+                      placeholder="58.50"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <Label htmlFor="due_date">Fecha de vencimiento</Label>
+                  <Label htmlFor="due_date">Fecha de Vencimiento</Label>
                   <Input
                     id="due_date"
                     type="date"
@@ -316,45 +513,72 @@ export default function Invoices() {
                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notas</Label>
+                  <Label htmlFor="notes">Notas / Condiciones</Label>
                   <Textarea
                     id="notes"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Notas adicionales..."
+                    placeholder="Condiciones de pago, notas adicionales..."
                     rows={2}
                   />
                 </div>
+
+                {/* Resumen de factura */}
                 {formData.amount && (
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span>Base imponible:</span>
-                      <span>{formatCurrency(parseFloat(formData.amount) || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>IVA ({formData.tax_rate}%):</span>
-                      <span>{formatCurrency((parseFloat(formData.amount) || 0) * parseFloat(formData.tax_rate) / 100)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold mt-2 pt-2 border-t">
-                      <span>Total:</span>
-                      <span>{formatCurrency((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100))}</span>
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <h4 className="font-semibold text-sm mb-3">Resumen de Factura</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Base imponible:</span>
+                        <span>{formatCurrency(parseFloat(formData.amount) || 0, formData.currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>ITBIS ({formData.tax_rate}%):</span>
+                        <span>{formatCurrency((parseFloat(formData.amount) || 0) * parseFloat(formData.tax_rate) / 100, formData.currency)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold pt-2 border-t">
+                        <span>Total:</span>
+                        <span>{formatCurrency((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100), formData.currency)}</span>
+                      </div>
+                      {formData.currency === 'USD' && formData.exchange_rate && (
+                        <div className="flex justify-between text-muted-foreground pt-2 border-t">
+                          <span>Equivalente en RD$:</span>
+                          <span>{formatCurrency((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100) * parseFloat(formData.exchange_rate), 'DOP')}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
+
                 <div className="flex justify-end gap-3 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
                   </Button>
                   <Button type="submit" className="gradient-primary" disabled={saving}>
                     {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Crear
+                    Crear Factura
                   </Button>
                 </div>
               </form>
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Info sobre facturación electrónica */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Receipt className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium text-sm">Sistema de Facturación Electrónica (e-CF) - DGII</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Conforme a la normativa de la Dirección General de Impuestos Internos de República Dominicana. 
+                Incluye NCF, RNC/Cédula e ITBIS. Las facturas anuladas quedan registradas en el sistema.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Table */}
         <Card className="shadow-card">
@@ -372,6 +596,7 @@ export default function Invoices() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>NCF</TableHead>
                     <TableHead>Nº Factura</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Concepto</TableHead>
@@ -383,11 +608,33 @@ export default function Invoices() {
                 </TableHeader>
                 <TableBody>
                   {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
+                    <TableRow key={invoice.id} className={invoice.status === 'cancelled' ? 'opacity-50' : ''}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {getNcfTypeBadge(invoice.ncf_type)}
+                          <p className="text-xs font-mono text-muted-foreground">{invoice.ncf || '-'}</p>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell>{invoice.clients?.name}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p>{invoice.clients?.name}</p>
+                          {invoice.rnc_cedula && (
+                            <p className="text-xs text-muted-foreground">RNC: {invoice.rnc_cedula}</p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="max-w-[200px] truncate">{invoice.concept}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(Number(invoice.total_amount))}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        <div>
+                          <p>{formatCurrency(Number(invoice.total_amount), invoice.currency)}</p>
+                          {invoice.currency === 'USD' && invoice.exchange_rate > 1 && (
+                            <p className="text-xs text-muted-foreground">
+                              ≈ {formatCurrency(Number(invoice.total_amount) * invoice.exchange_rate, 'DOP')}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {format(new Date(invoice.issue_date), 'd MMM yyyy', { locale: es })}
@@ -399,9 +646,11 @@ export default function Invoices() {
                               <CheckCircle className="h-4 w-4 text-success" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(invoice.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {invoice.status !== 'cancelled' && (
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(invoice.id)} title="Anular factura">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
