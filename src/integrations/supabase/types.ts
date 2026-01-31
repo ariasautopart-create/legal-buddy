@@ -399,12 +399,17 @@ export type Database = {
           client_id: string
           concept: string
           created_at: string
+          currency: string
           due_date: string | null
+          exchange_rate: number | null
           id: string
           invoice_number: string
           issue_date: string | null
+          ncf: string | null
+          ncf_type: string | null
           notes: string | null
           paid_date: string | null
+          rnc_cedula: string | null
           status: string | null
           tax_rate: number | null
           total_amount: number
@@ -417,12 +422,17 @@ export type Database = {
           client_id: string
           concept: string
           created_at?: string
+          currency?: string
           due_date?: string | null
+          exchange_rate?: number | null
           id?: string
           invoice_number: string
           issue_date?: string | null
+          ncf?: string | null
+          ncf_type?: string | null
           notes?: string | null
           paid_date?: string | null
+          rnc_cedula?: string | null
           status?: string | null
           tax_rate?: number | null
           total_amount: number
@@ -435,12 +445,17 @@ export type Database = {
           client_id?: string
           concept?: string
           created_at?: string
+          currency?: string
           due_date?: string | null
+          exchange_rate?: number | null
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          ncf?: string | null
+          ncf_type?: string | null
           notes?: string | null
           paid_date?: string | null
+          rnc_cedula?: string | null
           status?: string | null
           tax_rate?: number | null
           total_amount?: number
