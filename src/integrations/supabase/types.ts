@@ -404,6 +404,8 @@ export type Database = {
           exchange_rate: number | null
           id: string
           invoice_number: string
+          isr_retention_amount: number | null
+          isr_retention_rate: number | null
           issue_date: string | null
           ncf: string | null
           ncf_type: string | null
@@ -427,6 +429,8 @@ export type Database = {
           exchange_rate?: number | null
           id?: string
           invoice_number: string
+          isr_retention_amount?: number | null
+          isr_retention_rate?: number | null
           issue_date?: string | null
           ncf?: string | null
           ncf_type?: string | null
@@ -450,6 +454,8 @@ export type Database = {
           exchange_rate?: number | null
           id?: string
           invoice_number?: string
+          isr_retention_amount?: number | null
+          isr_retention_rate?: number | null
           issue_date?: string | null
           ncf?: string | null
           ncf_type?: string | null
