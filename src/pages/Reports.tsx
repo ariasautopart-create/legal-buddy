@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { DGIIReports } from '@/components/reports/DGIIReports';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   BarChart, 
@@ -355,10 +356,11 @@ export default function Reports() {
 
         {/* Charts Tabs */}
         <Tabs defaultValue="cases" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
             <TabsTrigger value="cases">Casos</TabsTrigger>
             <TabsTrigger value="billing">Facturación</TabsTrigger>
             <TabsTrigger value="productivity">Productividad</TabsTrigger>
+            <TabsTrigger value="dgii">DGII</TabsTrigger>
           </TabsList>
 
           {/* Cases Tab */}
@@ -716,6 +718,11 @@ export default function Reports() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* DGII Tab */}
+          <TabsContent value="dgii" className="mt-6">
+            <DGIIReports />
           </TabsContent>
         </Tabs>
       </div>
