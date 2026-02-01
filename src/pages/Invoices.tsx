@@ -35,6 +35,8 @@ interface Invoice {
   ncf: string | null;
   exchange_rate: number;
   rnc_cedula: string | null;
+  isr_retention_rate: number;
+  isr_retention_amount: number;
   clients?: { name: string; document_number: string | null };
 }
 
@@ -65,6 +67,16 @@ const itbisOptions = [
   { value: '18', label: '18% - General' },
 ];
 
+// Tasas de retención ISR según normativa DGII
+const isrRetentionOptions = [
+  { value: '0', label: '0% - Sin retención' },
+  { value: '5', label: '5% - Honorarios profesionales' },
+  { value: '10', label: '10% - Otros servicios' },
+  { value: '15', label: '15% - Premios' },
+  { value: '25', label: '25% - Dividendos' },
+  { value: '27', label: '27% - Pagos al exterior' },
+];
+
 const statusOptions = [
   { value: 'pending', label: 'Pendiente', color: 'bg-warning/10 text-warning border-warning/20' },
   { value: 'paid', label: 'Pagada', color: 'bg-success/10 text-success border-success/20' },
@@ -92,7 +104,8 @@ export default function Invoices() {
     ncf_type: 'B02',
     ncf: '',
     exchange_rate: '1.00',
-    rnc_cedula: ''
+    rnc_cedula: '',
+    isr_retention_rate: '0'
   });
   const [saving, setSaving] = useState(false);
   const [currencyFilter, setCurrencyFilter] = useState<string>('all');
@@ -172,7 +185,10 @@ export default function Invoices() {
 
     const amount = parseFloat(formData.amount);
     const taxRate = parseFloat(formData.tax_rate);
-    const totalAmount = amount + (amount * taxRate / 100);
+    const isrRetentionRate = parseFloat(formData.isr_retention_rate);
+    const itbisAmount = amount * taxRate / 100;
+    const isrRetentionAmount = amount * isrRetentionRate / 100;
+    const totalAmount = amount + itbisAmount - isrRetentionAmount;
 
     setSaving(true);
     try {
@@ -192,7 +208,9 @@ export default function Invoices() {
           ncf_type: formData.ncf_type,
           ncf: formData.ncf,
           exchange_rate: parseFloat(formData.exchange_rate),
-          rnc_cedula: formData.rnc_cedula || null
+          rnc_cedula: formData.rnc_cedula || null,
+          isr_retention_rate: isrRetentionRate,
+          isr_retention_amount: isrRetentionAmount
         });
 
       if (error) throw error;
@@ -252,7 +270,8 @@ export default function Invoices() {
       ncf_type: 'B02',
       ncf: '',
       exchange_rate: '1.00',
-      rnc_cedula: ''
+      rnc_cedula: '',
+      isr_retention_rate: '0'
     });
   };
 
@@ -501,6 +520,21 @@ export default function Invoices() {
                   </div>
                 </div>
 
+                {/* Retención ISR */}
+                <div className="space-y-2">
+                  <Label htmlFor="isr_retention_rate">Retención ISR</Label>
+                  <Select value={formData.isr_retention_rate} onValueChange={(v) => setFormData({ ...formData, isr_retention_rate: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isrRetentionOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {formData.currency === 'USD' && (
                   <div className="space-y-2">
                     <Label htmlFor="exchange_rate">Tasa de Cambio (1 USD = X DOP)</Label>
@@ -547,16 +581,31 @@ export default function Invoices() {
                       </div>
                       <div className="flex justify-between">
                         <span>ITBIS ({formData.tax_rate}%):</span>
-                        <span>{formatCurrency((parseFloat(formData.amount) || 0) * parseFloat(formData.tax_rate) / 100, formData.currency)}</span>
+                        <span>+{formatCurrency((parseFloat(formData.amount) || 0) * parseFloat(formData.tax_rate) / 100, formData.currency)}</span>
                       </div>
+                      {parseFloat(formData.isr_retention_rate) > 0 && (
+                        <div className="flex justify-between text-destructive">
+                          <span>Retención ISR ({formData.isr_retention_rate}%):</span>
+                          <span>-{formatCurrency((parseFloat(formData.amount) || 0) * parseFloat(formData.isr_retention_rate) / 100, formData.currency)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold pt-2 border-t">
-                        <span>Total:</span>
-                        <span>{formatCurrency((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100), formData.currency)}</span>
+                        <span>Total a Pagar:</span>
+                        <span>{formatCurrency(
+                          (parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100) - 
+                          (parseFloat(formData.amount) || 0) * parseFloat(formData.isr_retention_rate) / 100, 
+                          formData.currency
+                        )}</span>
                       </div>
                       {formData.currency === 'USD' && formData.exchange_rate && (
                         <div className="flex justify-between text-muted-foreground pt-2 border-t">
                           <span>Equivalente en RD$:</span>
-                          <span>{formatCurrency((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100) * parseFloat(formData.exchange_rate), 'DOP')}</span>
+                          <span>{formatCurrency(
+                            ((parseFloat(formData.amount) || 0) * (1 + parseFloat(formData.tax_rate) / 100) - 
+                            (parseFloat(formData.amount) || 0) * parseFloat(formData.isr_retention_rate) / 100) * 
+                            parseFloat(formData.exchange_rate), 
+                            'DOP'
+                          )}</span>
                         </div>
                       )}
                     </div>

@@ -19,6 +19,8 @@ interface InvoiceData {
   ncf: string | null;
   exchange_rate: number;
   rnc_cedula: string | null;
+  isr_retention_rate?: number;
+  isr_retention_amount?: number;
   clients?: { name: string; document_number: string | null };
 }
 
@@ -222,7 +224,18 @@ export function useInvoicePdf() {
     yPos += 6;
     const itbisAmount = Number(invoice.amount) * (invoice.tax_rate / 100);
     doc.text(`ITBIS (${invoice.tax_rate}%):`, summaryX, yPos);
-    doc.text(formatCurrency(itbisAmount, invoice.currency), pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`+${formatCurrency(itbisAmount, invoice.currency)}`, pageWidth - margin, yPos, { align: 'right' });
+
+    // Retención ISR
+    const isrRetentionRate = invoice.isr_retention_rate || 0;
+    const isrRetentionAmount = invoice.isr_retention_amount || 0;
+    if (isrRetentionRate > 0) {
+      yPos += 6;
+      doc.setTextColor(192, 57, 43); // Rojo para retención
+      doc.text(`Retención ISR (${isrRetentionRate}%):`, summaryX, yPos);
+      doc.text(`-${formatCurrency(isrRetentionAmount, invoice.currency)}`, pageWidth - margin, yPos, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+    }
 
     // Línea antes del total
     yPos += 4;
@@ -235,7 +248,7 @@ export function useInvoicePdf() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(25, 91, 166);
-    doc.text('TOTAL:', summaryX, yPos);
+    doc.text('TOTAL A PAGAR:', summaryX, yPos);
     doc.text(formatCurrency(Number(invoice.total_amount), invoice.currency), pageWidth - margin, yPos, { align: 'right' });
 
     // Equivalente en DOP si es USD
