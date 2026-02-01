@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, FileText, Trash2, Loader2, CheckCircle, Printer, Receipt } from 'lucide-react';
+import { Plus, Search, FileText, Trash2, Loader2, CheckCircle, Printer, Receipt, Download } from 'lucide-react';
+import { useInvoicePdf } from '@/hooks/useInvoicePdf';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -95,6 +96,16 @@ export default function Invoices() {
   });
   const [saving, setSaving] = useState(false);
   const [currencyFilter, setCurrencyFilter] = useState<string>('all');
+  const { generatePdf } = useInvoicePdf();
+
+  const handleDownloadPdf = (invoice: Invoice) => {
+    try {
+      generatePdf(invoice);
+      toast({ title: 'PDF generado', description: `Factura ${invoice.ncf || invoice.invoice_number} descargada` });
+    } catch (error) {
+      toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -641,6 +652,14 @@ export default function Invoices() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDownloadPdf(invoice)} 
+                            title="Descargar PDF"
+                          >
+                            <Download className="h-4 w-4 text-primary" />
+                          </Button>
                           {invoice.status === 'pending' && (
                             <Button variant="ghost" size="icon" onClick={() => handleMarkPaid(invoice.id)} title="Marcar como pagada">
                               <CheckCircle className="h-4 w-4 text-success" />
