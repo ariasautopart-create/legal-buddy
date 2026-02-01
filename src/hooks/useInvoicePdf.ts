@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import QRCode from 'qrcode';
 
 interface InvoiceData {
   id: string;
@@ -38,6 +39,13 @@ const NCF_TYPES: Record<string, string> = {
   'B14': 'Régimen Especial',
   'B15': 'Gubernamental',
   'B16': 'Exportación',
+  'E31': 'e-CF Crédito Fiscal',
+  'E32': 'e-CF Consumo',
+  'E33': 'e-CF Nota de Débito',
+  'E34': 'e-CF Nota de Crédito',
+  'E44': 'e-CF Régimen Especial',
+  'E45': 'e-CF Gubernamental',
+  'E46': 'e-CF Exportación',
 };
 
 export function useInvoicePdf() {
@@ -49,7 +57,38 @@ export function useInvoicePdf() {
     }).format(amount)}`;
   };
 
-  const generatePdf = (invoice: InvoiceData, companyInfo?: Partial<CompanyInfo>) => {
+  const isElectronicNCF = (ncfType: string | null): boolean => {
+    return ncfType?.startsWith('E') || false;
+  };
+
+  const generateQRData = (invoice: InvoiceData, companyInfo: CompanyInfo): string => {
+    // Datos del QR según especificaciones de la DGII para e-CF
+    const qrData = {
+      RNCEmisor: companyInfo.rnc,
+      RNCComprador: invoice.rnc_cedula || '',
+      ENCF: invoice.ncf || '',
+      FechaEmision: invoice.issue_date,
+      MontoTotal: invoice.total_amount,
+      MontoITBIS: Number(invoice.amount) * (invoice.tax_rate / 100),
+      CodigoSeguridad: generateSecurityCode(invoice),
+      FechaFirma: new Date().toISOString().split('T')[0],
+    };
+    return JSON.stringify(qrData);
+  };
+
+  const generateSecurityCode = (invoice: InvoiceData): string => {
+    // Código de seguridad simulado (en producción sería generado por la DGII)
+    const base = `${invoice.ncf}${invoice.issue_date}${invoice.total_amount}`;
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) {
+      const char = base.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16).toUpperCase().padStart(8, '0').slice(0, 8);
+  };
+
+  const generatePdf = async (invoice: InvoiceData, companyInfo?: Partial<CompanyInfo>) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
@@ -64,18 +103,27 @@ export function useInvoicePdf() {
       email: companyInfo?.email || 'contacto@miempresa.com',
     };
 
+    const isElectronic = isElectronicNCF(invoice.ncf_type);
+
     // ============ ENCABEZADO ============
-    // Título y tipo de documento
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(25, 91, 166); // Azul corporativo
-    doc.text('FACTURA ELECTRÓNICA', pageWidth / 2, yPos, { align: 'center' });
+    doc.setTextColor(25, 91, 166);
     
-    yPos += 8;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text('Comprobante Fiscal Electrónico (e-CF)', pageWidth / 2, yPos, { align: 'center' });
+    if (isElectronic) {
+      doc.text('COMPROBANTE FISCAL ELECTRÓNICO', pageWidth / 2, yPos, { align: 'center' });
+      yPos += 6;
+      doc.setFontSize(10);
+      doc.setTextColor(39, 174, 96);
+      doc.text('e-CF - DGII República Dominicana', pageWidth / 2, yPos, { align: 'center' });
+    } else {
+      doc.text('FACTURA ELECTRÓNICA', pageWidth / 2, yPos, { align: 'center' });
+      yPos += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Comprobante Fiscal (NCF) - DGII', pageWidth / 2, yPos, { align: 'center' });
+    }
 
     // Línea decorativa
     yPos += 5;
@@ -104,25 +152,30 @@ export function useInvoicePdf() {
 
     // ============ NCF - CUADRO DESTACADO ============
     yPos += 10;
-    const ncfBoxWidth = 80;
-    const ncfBoxHeight = 22;
+    const ncfBoxWidth = 85;
+    const ncfBoxHeight = isElectronic ? 28 : 22;
     const ncfBoxX = pageWidth - margin - ncfBoxWidth;
 
     // Fondo del cuadro NCF
-    doc.setFillColor(245, 247, 250);
-    doc.setDrawColor(25, 91, 166);
+    if (isElectronic) {
+      doc.setFillColor(232, 245, 233); // Verde claro para e-NCF
+      doc.setDrawColor(39, 174, 96);
+    } else {
+      doc.setFillColor(245, 247, 250);
+      doc.setDrawColor(25, 91, 166);
+    }
     doc.setLineWidth(0.3);
     doc.roundedRect(ncfBoxX, yPos - 5, ncfBoxWidth, ncfBoxHeight, 2, 2, 'FD');
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(25, 91, 166);
-    doc.text('COMPROBANTE FISCAL', ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
+    doc.setTextColor(isElectronic ? 39 : 25, isElectronic ? 174 : 91, isElectronic ? 96 : 166);
+    doc.text(isElectronic ? 'COMPROBANTE ELECTRÓNICO (e-CF)' : 'COMPROBANTE FISCAL', ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
     
     yPos += 5;
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`NCF: ${invoice.ncf || 'N/A'}`, ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
+    doc.text(`${isElectronic ? 'e-NCF' : 'NCF'}: ${invoice.ncf || 'N/A'}`, ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
     
     yPos += 5;
     doc.setFontSize(8);
@@ -130,8 +183,15 @@ export function useInvoicePdf() {
     const ncfTypeLabel = invoice.ncf_type ? NCF_TYPES[invoice.ncf_type] || invoice.ncf_type : '';
     doc.text(`Tipo: ${invoice.ncf_type} - ${ncfTypeLabel}`, ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
 
+    if (isElectronic) {
+      yPos += 5;
+      doc.setFontSize(7);
+      doc.setTextColor(39, 174, 96);
+      doc.text(`Código Seguridad: ${generateSecurityCode(invoice)}`, ncfBoxX + ncfBoxWidth / 2, yPos, { align: 'center' });
+    }
+
     // ============ DATOS DE LA FACTURA ============
-    const dataStartY = yPos - 15;
+    const dataStartY = yPos - (isElectronic ? 20 : 15);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
@@ -152,7 +212,7 @@ export function useInvoicePdf() {
     }
 
     // ============ DATOS DEL CLIENTE ============
-    yPos += 18;
+    yPos += (isElectronic ? 15 : 12);
     doc.setFillColor(240, 242, 245);
     doc.rect(margin, yPos, pageWidth - 2 * margin, 22, 'F');
 
@@ -212,7 +272,6 @@ export function useInvoicePdf() {
     // ============ RESUMEN DE MONTOS ============
     yPos += 20;
     const summaryX = pageWidth - margin - 70;
-    const summaryWidth = 70;
 
     // Base imponible
     doc.setFontSize(9);
@@ -231,7 +290,7 @@ export function useInvoicePdf() {
     const isrRetentionAmount = invoice.isr_retention_amount || 0;
     if (isrRetentionRate > 0) {
       yPos += 6;
-      doc.setTextColor(192, 57, 43); // Rojo para retención
+      doc.setTextColor(192, 57, 43);
       doc.text(`Retención ISR (${isrRetentionRate}%):`, summaryX, yPos);
       doc.text(`-${formatCurrency(isrRetentionAmount, invoice.currency)}`, pageWidth - margin, yPos, { align: 'right' });
       doc.setTextColor(0, 0, 0);
@@ -261,23 +320,74 @@ export function useInvoicePdf() {
       doc.text(`Equivalente: ${formatCurrency(equivalentDOP, 'DOP')} (Tasa: ${invoice.exchange_rate})`, pageWidth - margin, yPos, { align: 'right' });
     }
 
-    // ============ NOTAS ============
-    if (invoice.notes) {
+    // ============ CÓDIGO QR PARA e-NCF ============
+    if (isElectronic) {
       yPos += 15;
-      doc.setFontSize(9);
+      
+      // Generar QR Code
+      const qrData = generateQRData(invoice, company);
+      const qrDataUrl = await QRCode.toDataURL(qrData, {
+        width: 100,
+        margin: 1,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+
+      // Cuadro del QR
+      const qrBoxWidth = 55;
+      const qrBoxHeight = 65;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(39, 174, 96);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin, yPos, qrBoxWidth, qrBoxHeight, 3, 3, 'FD');
+
+      // Añadir QR al PDF
+      doc.addImage(qrDataUrl, 'PNG', margin + 7.5, yPos + 3, 40, 40);
+
+      // Texto debajo del QR
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('Notas:', margin, yPos);
-      yPos += 5;
+      doc.setTextColor(39, 174, 96);
+      doc.text('VALIDACIÓN e-CF', margin + qrBoxWidth / 2, yPos + 47, { align: 'center' });
+      
+      doc.setFontSize(6);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-      const notesLines = doc.splitTextToSize(invoice.notes, pageWidth - 2 * margin);
-      doc.text(notesLines, margin, yPos);
-      yPos += notesLines.length * 4;
+      doc.setTextColor(100, 100, 100);
+      doc.text('Escanee para verificar', margin + qrBoxWidth / 2, yPos + 52, { align: 'center' });
+      doc.text('autenticidad DGII', margin + qrBoxWidth / 2, yPos + 56, { align: 'center' });
+
+      // Notas al lado del QR si hay
+      if (invoice.notes) {
+        const notesX = margin + qrBoxWidth + 10;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Notas:', notesX, yPos + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        const notesLines = doc.splitTextToSize(invoice.notes, pageWidth - notesX - margin);
+        doc.text(notesLines, notesX, yPos + 12);
+      }
+
+      yPos += qrBoxHeight + 5;
+    } else {
+      // ============ NOTAS (sin QR) ============
+      if (invoice.notes) {
+        yPos += 15;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Notas:', margin, yPos);
+        yPos += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        const notesLines = doc.splitTextToSize(invoice.notes, pageWidth - 2 * margin);
+        doc.text(notesLines, margin, yPos);
+        yPos += notesLines.length * 4;
+      }
     }
 
     // ============ ESTADO DE PAGO ============
-    yPos += 15;
+    yPos += 10;
     const statusLabels: Record<string, { text: string; color: [number, number, number] }> = {
       'pending': { text: 'PENDIENTE DE PAGO', color: [230, 126, 34] },
       'paid': { text: 'PAGADA', color: [39, 174, 96] },
@@ -310,14 +420,21 @@ export function useInvoicePdf() {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text('Este documento es una Factura Electrónica válida según la normativa de la DGII', pageWidth / 2, footerY + 5, { align: 'center' });
-    doc.text('Dirección General de Impuestos Internos - República Dominicana', pageWidth / 2, footerY + 9, { align: 'center' });
+    
+    if (isElectronic) {
+      doc.text('Este documento es un Comprobante Fiscal Electrónico (e-CF) válido según la normativa de la DGII', pageWidth / 2, footerY + 5, { align: 'center' });
+      doc.text('Verifique la autenticidad escaneando el código QR', pageWidth / 2, footerY + 9, { align: 'center' });
+    } else {
+      doc.text('Este documento es una Factura válida según la normativa de la DGII', pageWidth / 2, footerY + 5, { align: 'center' });
+      doc.text('Dirección General de Impuestos Internos - República Dominicana', pageWidth / 2, footerY + 9, { align: 'center' });
+    }
     
     doc.setFontSize(7);
     doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}`, pageWidth / 2, footerY + 14, { align: 'center' });
 
     // Guardar el archivo
-    const fileName = `Factura_${invoice.ncf || invoice.invoice_number}_${format(new Date(invoice.issue_date), 'yyyyMMdd')}.pdf`;
+    const prefix = isElectronic ? 'eCF' : 'Factura';
+    const fileName = `${prefix}_${invoice.ncf || invoice.invoice_number}_${format(new Date(invoice.issue_date), 'yyyyMMdd')}.pdf`;
     doc.save(fileName);
 
     return fileName;

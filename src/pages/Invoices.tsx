@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, FileText, Trash2, Loader2, CheckCircle, Printer, Receipt, Download } from 'lucide-react';
+import { Plus, Search, FileText, Trash2, Loader2, CheckCircle, Printer, Receipt, Download, RotateCcw } from 'lucide-react';
 import { useInvoicePdf } from '@/hooks/useInvoicePdf';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,13 +46,20 @@ interface Client {
   document_number: string | null;
 }
 
-// Tipos de NCF según normativa DGII República Dominicana
+// Tipos de NCF según normativa DGII República Dominicana (incluye e-NCF)
 const ncfTypes = [
-  { value: 'B01', label: 'B01 - Crédito Fiscal', description: 'Para contribuyentes con RNC' },
-  { value: 'B02', label: 'B02 - Consumo Final', description: 'Para consumidores finales' },
-  { value: 'B14', label: 'B14 - Régimen Especial', description: 'Zonas francas y régimen especial' },
-  { value: 'B15', label: 'B15 - Gubernamental', description: 'Entidades gubernamentales' },
-  { value: 'B16', label: 'B16 - Exportación', description: 'Exportaciones' },
+  { value: 'B01', label: 'B01 - Crédito Fiscal', description: 'Para contribuyentes con RNC', electronic: false },
+  { value: 'B02', label: 'B02 - Consumo Final', description: 'Para consumidores finales', electronic: false },
+  { value: 'B14', label: 'B14 - Régimen Especial', description: 'Zonas francas y régimen especial', electronic: false },
+  { value: 'B15', label: 'B15 - Gubernamental', description: 'Entidades gubernamentales', electronic: false },
+  { value: 'B16', label: 'B16 - Exportación', description: 'Exportaciones', electronic: false },
+  { value: 'E31', label: 'E31 - e-CF Crédito Fiscal', description: 'Comprobante electrónico para contribuyentes', electronic: true },
+  { value: 'E32', label: 'E32 - e-CF Consumo', description: 'Comprobante electrónico consumidor final', electronic: true },
+  { value: 'E33', label: 'E33 - e-CF Nota de Débito', description: 'Nota de débito electrónica', electronic: true },
+  { value: 'E34', label: 'E34 - e-CF Nota de Crédito', description: 'Nota de crédito electrónica', electronic: true },
+  { value: 'E44', label: 'E44 - e-CF Régimen Especial', description: 'Comprobante electrónico zonas francas', electronic: true },
+  { value: 'E45', label: 'E45 - e-CF Gubernamental', description: 'Comprobante electrónico gubernamental', electronic: true },
+  { value: 'E46', label: 'E46 - e-CF Exportación', description: 'Comprobante electrónico exportación', electronic: true },
 ];
 
 const currencyOptions = [
@@ -111,11 +118,12 @@ export default function Invoices() {
   const [currencyFilter, setCurrencyFilter] = useState<string>('all');
   const { generatePdf } = useInvoicePdf();
 
-  const handleDownloadPdf = (invoice: Invoice) => {
+  const handleDownloadPdf = async (invoice: Invoice) => {
     try {
-      generatePdf(invoice);
+      await generatePdf(invoice);
       toast({ title: 'PDF generado', description: `Factura ${invoice.ncf || invoice.invoice_number} descargada` });
     } catch (error) {
+      console.error('Error generating PDF:', error);
       toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive' });
     }
   };
@@ -127,18 +135,47 @@ export default function Invoices() {
     }
   }, [user]);
 
-  // Generar NCF automático basado en el tipo
+  // Estado para el contador de NCF
+  const [ncfCounters, setNcfCounters] = useState<Record<string, number>>({});
+
+  // Cargar contadores de NCF desde localStorage
+  useEffect(() => {
+    const savedCounters = localStorage.getItem('ncf_counters');
+    if (savedCounters) {
+      setNcfCounters(JSON.parse(savedCounters));
+    }
+  }, []);
+
+  // Generar NCF secuencial basado en el tipo
   const generateNCF = (type: string) => {
-    const timestamp = Date.now().toString().slice(-8);
-    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-    return `${type}${timestamp}${random}`;
+    const currentCounter = ncfCounters[type] || 0;
+    const nextCounter = currentCounter + 1;
+    // Formato: TIPO + 8 dígitos secuenciales (Ej: E3100000001)
+    return `${type}${nextCounter.toString().padStart(8, '0')}`;
+  };
+
+  // Incrementar y guardar contador al crear factura
+  const incrementNcfCounter = (type: string) => {
+    const currentCounter = ncfCounters[type] || 0;
+    const newCounters = { ...ncfCounters, [type]: currentCounter + 1 };
+    setNcfCounters(newCounters);
+    localStorage.setItem('ncf_counters', JSON.stringify(newCounters));
+  };
+
+  // Resetear contadores de NCF
+  const resetNcfCounters = () => {
+    if (confirm('¿Está seguro de resetear todos los contadores de NCF? Esta acción no se puede deshacer.')) {
+      setNcfCounters({});
+      localStorage.removeItem('ncf_counters');
+      toast({ title: 'Contadores reseteados', description: 'Todos los contadores de NCF han sido reseteados a 0' });
+    }
   };
 
   useEffect(() => {
     if (formData.ncf_type && !formData.ncf) {
       setFormData(prev => ({ ...prev, ncf: generateNCF(prev.ncf_type) }));
     }
-  }, [formData.ncf_type]);
+  }, [formData.ncf_type, ncfCounters]);
 
   // Auto-completar RNC/Cédula cuando se selecciona cliente
   const handleClientChange = (clientId: string) => {
@@ -214,6 +251,7 @@ export default function Invoices() {
         });
 
       if (error) throw error;
+      incrementNcfCounter(formData.ncf_type);
       toast({ title: 'Factura electrónica creada', description: `NCF: ${formData.ncf}` });
       setIsDialogOpen(false);
       resetForm();
@@ -258,6 +296,7 @@ export default function Invoices() {
   };
 
   const resetForm = () => {
+    const defaultNcfType = 'E32';
     setFormData({
       invoice_number: '',
       concept: '',
@@ -267,8 +306,8 @@ export default function Invoices() {
       due_date: '',
       notes: '',
       currency: 'DOP',
-      ncf_type: 'B02',
-      ncf: '',
+      ncf_type: defaultNcfType,
+      ncf: generateNCF(defaultNcfType),
       exchange_rate: '1.00',
       rnc_cedula: '',
       isr_retention_rate: '0'
@@ -307,9 +346,13 @@ export default function Invoices() {
   const getNcfTypeBadge = (ncfType: string | null) => {
     if (!ncfType) return null;
     const type = ncfTypes.find(t => t.value === ncfType);
+    const isElectronic = ncfType.startsWith('E');
     return (
-      <Badge variant="secondary" className="text-xs">
-        {type?.value || ncfType}
+      <Badge 
+        variant="secondary" 
+        className={`text-xs ${isElectronic ? 'bg-success/20 text-success border-success/30' : ''}`}
+      >
+        {isElectronic && '⚡'} {type?.value || ncfType}
       </Badge>
     );
   };
@@ -379,6 +422,14 @@ export default function Invoices() {
                 <SelectItem value="USD">US$ Dólares</SelectItem>
               </SelectContent>
             </Select>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={resetNcfCounters}
+              title="Resetear contadores NCF"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
